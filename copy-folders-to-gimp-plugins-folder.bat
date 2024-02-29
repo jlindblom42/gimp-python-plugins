@@ -5,8 +5,8 @@ setlocal enabledelayedexpansion
 set "defaultDir=C:\Program Files\GIMP 2\lib\gimp\2.0\plug-ins"
 
 :: Prompt the user for the Python plugins directory, showing the default
-echo Provide Gimp Python plugins directory. (Press Enter to default to [%defaultDir%])
-set /p "gimpPluginsDir=Directory: "
+:: echo Provide Gimp Python plugins directory. (Press Enter to default to [%defaultDir%])
+:: set /p "gimpPluginsDir=Directory: "
 
 :: If user input is empty, use the default directory
 if "!gimpPluginsDir!"=="" set "gimpPluginsDir=%defaultDir%"
