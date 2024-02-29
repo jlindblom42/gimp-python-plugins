@@ -22,14 +22,25 @@ for /d %%d in (jdl-*) do (
     :: Construct the target path
     set "folderName=%%d"
     set "targetPath=!scriptDir!!folderName!"
-    set "linkPath=!gimpPluginsDir!\!folderName!"
+    set "copyPath=!gimpPluginsDir!\!folderName!"
 
-    :: Check if the symbolic link or directory already exists at the target location
-    if exist "!linkPath!" (
-        echo [Warning] Link already exists: "!linkPath!"
-    ) else (
-        :: If it doesn't exist, create the symbolic link
-        mklink /D "!linkPath!" "!targetPath!"
+    :: Warn if the folder already exists
+    set "overwrite="
+    if exist "!copyPath!" (
+        set "overwrite= (Overwritten)"
+    )
+
+    :: Print the operation details
+    echo Input  "!targetPath!"
+    echo Output "!copyPath!" !overwrite!
+
+    :: Execute the copy operation without showing any robocopy output, but check for errors
+    robocopy "!targetPath!" "!copyPath!" /MIR /COPYALL /R:5 /W:2 /NFL /NDL /NS /NC /NP > nul 2>&1
+    set "exitCode=%ERRORLEVEL%"
+
+    :: Check the exit code for errors (codes 8 to 16 indicate an error)
+    if !exitCode! GEQ 8 (
+        echo Error occurred during copying. Error Level: !exitCode!
     )
 )
 
