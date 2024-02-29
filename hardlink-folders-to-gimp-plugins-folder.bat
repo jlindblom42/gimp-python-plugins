@@ -17,8 +17,8 @@ set "scriptDir=%~dp0"
 :: Ensure path ends with a backslash
 if not "!scriptDir:~-1!"=="\" set "scriptDir=!scriptDir!\"
 
-:: Loop through each folder in the current directory
-for /d %%d in (*) do (
+:: Loop through each folder in the current directory with the prefix "jdl-"
+for /d %%d in (jdl-*) do (
     :: Construct the target path
     set "folderName=%%d"
     set "targetPath=!scriptDir!!folderName!"
