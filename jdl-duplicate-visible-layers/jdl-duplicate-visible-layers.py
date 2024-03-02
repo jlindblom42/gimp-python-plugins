@@ -31,13 +31,15 @@ def duplicate_visible_layers(image, drawable, mirrored, num_iterations):
                 sequence_end = layer_index + 1
 
         if sequence_start is not None and sequence_end is not None:
-            sequence_layers = []
-            for sequence_index in range(sequence_start, sequence_end):
-                # For each sequence index, extract the corresponding layer.
-                sequence_layers.append(layers[sequence_index])
-
             for iteration in range(num_iterations):
-                if not mirrored or iteration % 2 == 1:
+                sequence_layers = []
+                for sequence_index in range(sequence_start, sequence_end):
+                    # For each sequence index, extract the corresponding layer.
+                    sequence_layers.append(layers[sequence_index])
+
+                # If mirrored is True, reverse the order for every other iteration.
+                # Number of iterations being odd or even influences the starting point.
+                if mirrored and iteration % 2 == num_iterations % 2:
                     sequence_layers.reverse()
 
                 for sequence_layer in sequence_layers:
@@ -51,19 +53,9 @@ def duplicate_visible_layers(image, drawable, mirrored, num_iterations):
                         new_index = image.layers.index(curr_layer)
 
                     pdb.gimp_image_reorder_item(image, dup_layer, None, new_index)
+
             sequence_start = None
             sequence_end = None
-
-        # if layer.visible:
-        #     if sequence_start is None:
-        #         sequence_start = index
-        #
-        #     # Duplicate the layer
-        #     dup_layer = pdb.gimp_layer_copy(layer, True)
-        #     # Add the duplicate layer to the image
-        #     image.add_layer(dup_layer, image.layers.index(layer))
-        #     # Move the duplicated layer just below the original layer
-        #     pdb.gimp_image_reorder_item(image, dup_layer, None, image.layers.index(layer) + 1)
 
     pdb.gimp_undo_push_group_end(image)
     gimp.displays_flush()
