@@ -3,6 +3,7 @@
 import gimpui
 import gtk
 from gimpfu import *
+import time
 
 HORIZONTAL = 0
 VERTICAL = 1
@@ -24,6 +25,13 @@ def print_args(args):
 def set_text(progress_bar_text):
     progress_bar.set_text(progress_bar_text)
     gtk.main_iteration_do(False)
+
+
+def elapsed_message(message, prev_elapsed_time_sec=0):
+    total_time_sec = time.time() - start_time_sec
+    elapsed_time_sec = total_time_sec - prev_elapsed_time_sec
+    pdb.gimp_message("Completed %s\n[%.2f sec elapsed]\n[%.2f sec total]" % (message, elapsed_time_sec, total_time_sec))
+    return total_time_sec
 
 
 def guide_clear(image):
@@ -249,31 +257,27 @@ def center_and_rename_layers(image, remove_bg_color, vertical_align):
 
 
 def position_layer(image, layer, vertical_align):
-    img_w = image.width, img_h = image.height, layer_w = layer.width, layer_h = layer.height
+    new_x_pos = (image.width - layer.width) / 2
+    new_y_pos = {
+        'TOP': 0,
+        'BOTTOM': image.height - layer.height,
+        'CENTER': (image.height - layer.height) / 2,
+    }.get(vertical_align, 0)
 
-    new_x_pos = (img_w - layer_w) / 2
-    new_y_pos = None if False \
-        else 0 if vertical_align == TOP \
-        else img_h - layer_h if vertical_align == BOTTOM \
-        else (img_h - layer_h) / 2
-
-    layer.set_offsets(new_x_pos, new_y_pos)
+    layer.set_offsets(int(new_x_pos), int(new_y_pos))
 
 
 def center_and_rename_layer(image, index, layer, color_to_remove, vertical_align):
     position_layer(image, layer, vertical_align)
-
-    # Resize layer to image
     pdb.gimp_layer_resize_to_image_size(layer)
-    # Rename layer to index
-    layer.name = str(index) + " (replace)"
+    layer.name = "%d (replace)" % index
 
     if color_to_remove is not None:
         pdb.gimp_image_select_color(image, CHANNEL_OP_REPLACE, layer, color_to_remove)
-        non_empty_selection = pdb.gimp_selection_bounds(image)[0]
-        if non_empty_selection:
-            pdb.gimp_edit_clear(layer)  # Delete the selected area
-        pdb.gimp_selection_none(image)  # Deselect after deleting
+        # Check if selection is non-empty
+        if pdb.gimp_selection_bounds(image)[0]:
+            pdb.gimp_edit_clear(layer)
+        pdb.gimp_selection_none(image)
 
 
 def align_layer_keep_non_empty(image, layer):
@@ -289,14 +293,16 @@ def align_layer_keep_non_empty(image, layer):
 
 def sprite_guillotine(image, drawable, initial_direction, vertical_align, remove_bg_color, stop_after_initial):
     image.undo_group_start()
+    prev_elapsed_time_sec = 0
     loop_index = 0
     keep_looping = True
     while keep_looping:
         loop_index = loop_index + 1
-        loop_text = 'Loop #%d: ' % loop_index
+        loop_text = 'Guillotine Loop #%d: ' % loop_index
         set_text(loop_text)
         layer_index = 0
-        guillotine_performed = False
+        num_layers_existing = len(image.layers)
+        num_gillotines = 0
         for layer in image.layers:
             layer_index = layer_index + 1
             pdb.gimp_selection_none(image)
@@ -307,14 +313,20 @@ def sprite_guillotine(image, drawable, initial_direction, vertical_align, remove
                 return
             guide_id = pdb.gimp_image_find_next_guide(image, 0)
             if guide_id > 0:
-                guillotine_performed = True
+                num_gillotines += 1
                 guillotine_layer(image, layer, loop_text)
-        keep_looping = guillotine_performed
+        keep_looping = num_gillotines > 0
         pdb.gimp_displays_flush()
+        num_layers_created = len(image.layers) - num_layers_existing
+        prev_elapsed_time_sec = elapsed_message(
+            '%s\n%d of %d Layers Guillotined\n%d Layers Created' % (
+                loop_text, num_gillotines, num_layers_existing, num_layers_created),
+            prev_elapsed_time_sec)
 
     set_text('Finalizing layers...')
     tallest_height = 0
     widest_width = 0
+    num_layers_existing = len(image.layers)
     for layer in image.layers:
         tallest_height = max(tallest_height, layer.height)
         widest_width = max(widest_width, layer.width)
@@ -324,6 +336,7 @@ def sprite_guillotine(image, drawable, initial_direction, vertical_align, remove
     pdb.gimp_displays_flush()
     pdb.gimp_selection_none(image)
     image.undo_group_end()
+    elapsed_message("Layer Center/Rename\n%d Layers Processed" % num_layers_existing, prev_elapsed_time_sec)
 
 
 def sprite_guillotine_gui(image, drawable):
@@ -381,6 +394,9 @@ def sprite_guillotine_gui(image, drawable):
     response = dialog.run()
 
     if response == gtk.RESPONSE_OK:
+        global start_time_sec
+        start_time_sec = time.time()
+
         direction = None if False \
             else HORIZONTAL if horizontal_radio.get_active() \
             else VERTICAL
