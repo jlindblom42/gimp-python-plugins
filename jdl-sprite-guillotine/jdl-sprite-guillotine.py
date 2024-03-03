@@ -13,11 +13,7 @@ MIDDLE = 1
 BOTTOM = 2
 
 
-def set_text(progress_bar_text):
-    progress_bar.set_text(progress_bar_text)
-    gtk.main_iteration_do(False)
-
-
+# For debugging
 def print_args(args):
     output = ''
     for k, v in args:
@@ -25,21 +21,17 @@ def print_args(args):
     pdb.gimp_message(output)
 
 
+def set_text(progress_bar_text):
+    progress_bar.set_text(progress_bar_text)
+    gtk.main_iteration_do(False)
+
+
 def guide_clear(image):
-    # Directly removing guides without reversing the list or individually fetching them
     while True:
         guide_id = pdb.gimp_image_find_next_guide(image, 0)
         if guide_id == 0:
             break
         pdb.gimp_image_delete_guide(image, guide_id)
-
-
-def get_pixel_at_coordinates(image, layer, x, y):
-    # Get a pixel region representing the entire layer
-    region = layer.get_pixel_rgn(0, 0, layer.width, layer.height)
-    # Extract the pixel value. Format is (R, G, B, A) with values 0-255
-    pixel = region[x, y]
-    return pixel
 
 
 has_no_guides_map = {}
@@ -54,120 +46,124 @@ def guides_for_transparent(image, layer, loop_index, initial_direction):
     allow_vertical = not initial_loop or initial_direction != HORIZONTAL
     allow_horizontal = not initial_loop or initial_direction != VERTICAL
     guide_clear(image)
-    width = layer.width
-    height = layer.height
+    num_cols = layer.width
+    num_rows = layer.height
 
     transparency_memo = {}
 
     layer_pixel_rgn = layer.get_pixel_rgn(0, 0, layer.width, layer.height)
     layer_pixels = layer_pixel_rgn[:, :]  # Grab all pixels at once for efficiency
 
-    def is_transparent(x_, y_):
-        key = (x_, y_)
+    def is_transparent(col_index, row_index):
+        key = (col_index, row_index)
         if key not in transparency_memo:
-            # Assuming RGBA, where loop_index 3 is alpha:
-            # transparency_memo[key] = layer.get_pixel(x_, y_)[3] == 0
-            # pixel_data = layer_pixel_rgn[x_, y_]
-            # rgba = [ord(c) for c in pixel_data]
-            idx = (y_ * width + x_) * 4  # Assuming RGBA for each pixel
-            transparency_memo[key] = layer_pixels[idx + 3] == '\x00'  # Check if alpha byte signifies transparency
+            # Assuming RGBA for each pixel
+            idx = (row_index * num_cols + col_index) * 4
+            # Check if alpha byte signifies transparency
+            transparency_memo[key] = layer_pixels[idx + 3] == '\x00'
 
         return transparency_memo[key]
 
     if allow_horizontal:
         first_guide = True
-        for y in range(height):
-            current_row_transparent = True
-            for x in range(width):
-                if not is_transparent(x, y):
-                    current_row_transparent = False
+        for curr_row_index in range(num_rows):
+            curr_row_transparent = True
+            for curr_col_index in range(num_cols):
+                if not is_transparent(curr_col_index, curr_row_index):
+                    curr_row_transparent = False
                     break
 
-            if y == 0 and not current_row_transparent:
+            if curr_row_index == 0 and not curr_row_transparent:
                 first_guide = False
 
             next_row_transparent = True
-            for x in range(width):
-                if y + 1 < height and not is_transparent(x, y + 1):
+            next_row_index = curr_row_index + 1
+            for curr_col_index in range(num_cols):
+                if next_row_index < num_rows and not is_transparent(curr_col_index, next_row_index):
                     next_row_transparent = False
                     break
 
-            if current_row_transparent and next_row_transparent:
+            if curr_row_transparent and next_row_transparent:
                 continue
 
-            if not current_row_transparent and next_row_transparent:
+            if not curr_row_transparent and next_row_transparent:
                 continue
 
-            next_row_is_connected = False
-            if not current_row_transparent and not next_row_transparent:
-                for x in range(width):
-                    if not is_transparent(x, y):
-                        next_row_is_connected = (
-                                not is_transparent(x, y + 1)
-                                or (x + 1 < width
-                                    and not is_transparent(x + 1, y + 1))
-                                or (x - 1 > 0
-                                    and not is_transparent(x - 1, y + 1)))
+            next_row_connected = False
+            if not curr_row_transparent and not next_row_transparent:
+                for curr_col_index in range(num_cols):
+                    if not is_transparent(curr_col_index, curr_row_index):
+                        next_col_index = curr_col_index + 1
+                        prev_col_index = curr_col_index - 1
+                        next_row_connected = (
+                                not is_transparent(curr_col_index, next_row_index)
+                                or (next_col_index < num_cols
+                                    and not is_transparent(next_col_index, next_row_index))
+                                or (prev_col_index > 0
+                                    and not is_transparent(prev_col_index, next_row_index)))
 
-                        if next_row_is_connected:
+                        if next_row_connected:
                             break
 
-            if not current_row_transparent and not next_row_transparent and next_row_is_connected:
+            if not curr_row_transparent and not next_row_transparent and next_row_connected:
                 continue
 
             if first_guide:
                 first_guide = False
                 continue
 
-            pdb.gimp_image_add_hguide(image, y + 1)
+            pdb.gimp_image_add_hguide(image, next_row_index)
             has_no_guides = False
 
     if allow_vertical:
         first_guide = True
-        for x in range(width):
-            current_col_transparent = True
-            for y in range(height):
-                if not is_transparent(x, y):
-                    current_col_transparent = False
+        for curr_col_index in range(num_cols):
+            curr_col_transparent = True
+            for curr_row_index in range(num_rows):
+                if not is_transparent(curr_col_index, curr_row_index):
+                    curr_col_transparent = False
                     break
 
-            if x == 0 and not current_col_transparent:
+            if curr_col_index == 0 and not curr_col_transparent:
                 first_guide = False
 
             next_col_transparent = True
-            for y in range(height):
-                if x + 1 < width and not is_transparent(x + 1, y):
+            next_col_index = curr_col_index + 1
+            for curr_row_index in range(num_rows):
+                if next_col_index < num_cols and not is_transparent(next_col_index, curr_row_index):
                     next_col_transparent = False
                     break
 
-            if current_col_transparent and next_col_transparent:
+            if curr_col_transparent and next_col_transparent:
                 continue
 
-            if not current_col_transparent and next_col_transparent:
+            if not curr_col_transparent and next_col_transparent:
                 continue
 
-            next_col_is_connected = False
-            if not current_col_transparent and not next_col_transparent:
-                for y in range(height):
-                    if not is_transparent(x, y):
-                        next_col_is_connected = (
-                                not is_transparent(x + 1, y)
-                                or (y + 1 < height
-                                    and not is_transparent(x + 1, y + 1))
-                                or (y - 1 > 0
-                                    and not is_transparent(x + 1, y - 1)))
+            next_col_connected = False
+            if not curr_col_transparent and not next_col_transparent:
+                for curr_row_index in range(num_rows):
+                    if not is_transparent(curr_col_index, curr_row_index):
+                        next_row_index = curr_row_index + 1
+                        prev_row_index = curr_row_index - 1
+                        next_col_connected = (
+                                not is_transparent(next_col_index, curr_row_index)
+                                or (next_row_index < num_rows
+                                    and not is_transparent(next_col_index, next_row_index))
+                                or (prev_row_index > 0
+                                    and not is_transparent(next_col_index, prev_row_index)))
 
-                        if next_col_is_connected:
+                        if next_col_connected:
                             break
 
-            if not current_col_transparent and not next_col_transparent and next_col_is_connected:
+            if not curr_col_transparent and not next_col_transparent and next_col_connected:
                 continue
 
             if first_guide:
                 first_guide = False
                 continue
 
-            pdb.gimp_image_add_vguide(image, x + 1)
+            pdb.gimp_image_add_vguide(image, next_col_index)
             has_no_guides = False
 
     if has_no_guides:
