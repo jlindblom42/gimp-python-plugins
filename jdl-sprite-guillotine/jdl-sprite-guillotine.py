@@ -102,9 +102,13 @@ def guides_for_transparent(image, layer, loop_index, initial_direction):
             if not current_row_transparent and not next_row_transparent:
                 for x in range(width):
                     if not is_transparent(x, y):
-                        next_row_is_connected = (not is_transparent(x, y + 1)
-                                                 or (x + 1 < width and not is_transparent(x + 1, y + 1))
-                                                 or (x - 1 > 0 and not is_transparent(x - 1, y + 1)))
+                        next_row_is_connected = (
+                                not is_transparent(x, y + 1)
+                                or (x + 1 < width
+                                    and not is_transparent(x + 1, y + 1))
+                                or (x - 1 > 0
+                                    and not is_transparent(x - 1, y + 1)))
+
                         if next_row_is_connected:
                             break
 
@@ -146,9 +150,13 @@ def guides_for_transparent(image, layer, loop_index, initial_direction):
             if not current_col_transparent and not next_col_transparent:
                 for y in range(height):
                     if not is_transparent(x, y):
-                        next_col_is_connected = (not is_transparent(x + 1, y)
-                                                 or (y + 1 < height and not is_transparent(x + 1, y + 1))
-                                                 or (y - 1 > 0 and not is_transparent(x + 1, y - 1)))
+                        next_col_is_connected = (
+                                not is_transparent(x + 1, y)
+                                or (y + 1 < height
+                                    and not is_transparent(x + 1, y + 1))
+                                or (y - 1 > 0
+                                    and not is_transparent(x + 1, y - 1)))
+
                         if next_col_is_connected:
                             break
 
