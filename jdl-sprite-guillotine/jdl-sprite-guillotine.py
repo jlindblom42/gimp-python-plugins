@@ -247,23 +247,29 @@ def center_and_rename_layers(image, remove_bg_color, vertical_align):
         index += 1
 
 
-def position_layer(image, layer, align_bottom=True):
+def position_layer(image, layer, vertical_align):
     # Calculate the new X position to center the layer horizontally
     new_x_pos = (image.width - layer.width) / 2
 
-    if align_bottom:
+    if vertical_align == TOP:
+        # Align the layer's bottom with the image's bottom
+        new_y_pos = 0
+    elif vertical_align == BOTTOM:
         # Align the layer's bottom with the image's bottom
         new_y_pos = image.height - layer.height
     else:
         # Center the layer vertically
         new_y_pos = (image.height - layer.height) / 2
 
+    print_args([('new_x_pos', new_x_pos), ('new_y_pos', new_y_pos), ('vertical_align', vertical_align),
+                ('image_height', image.height), ('layer.height', layer.height)])
+
     # Set the layer's position
     layer.set_offsets(int(new_x_pos), int(new_y_pos))
 
 
 def center_and_rename_layer(image, index, layer, color_to_remove, vertical_align):
-    position_layer(image, layer, vertical_align == BOTTOM)
+    position_layer(image, layer, vertical_align)
 
     # Resize layer to image
     pdb.gimp_layer_resize_to_image_size(layer)
@@ -358,8 +364,10 @@ def sprite_guillotine_gui(image, drawable):
     vbox.pack_start(align_frame, False, False, 0)
     align_box = gtk.VBox(spacing=6)
     align_frame.add(align_box)
-    middle_radio = gtk.RadioButton(None, "Middle")
+    top_radio = gtk.RadioButton(None, "Top")
+    middle_radio = gtk.RadioButton(top_radio, "Middle")
     bottom_radio = gtk.RadioButton(middle_radio, "Bottom")
+    align_box.pack_start(top_radio, False, False, 0)
     align_box.pack_start(middle_radio, False, False, 0)
     align_box.pack_start(bottom_radio, False, False, 0)
     middle_radio.set_active(True)  # Default to middle
@@ -391,10 +399,13 @@ def sprite_guillotine_gui(image, drawable):
     response = dialog.run()
 
     if response == gtk.RESPONSE_OK:
-        # TODO: Collect the values from the GUI and pass them to your plugin's main function
-        # For example:
         direction = HORIZONTAL if horizontal_radio.get_active() else VERTICAL
-        align = MIDDLE if middle_radio.get_active() else BOTTOM
+        if top_radio.get_active():
+            align = TOP
+        elif middle_radio.get_active():
+            align = MIDDLE
+        else:
+            align = BOTTOM
         remove_bg = remove_bg_checkbox.get_active()
         stop_after_initial = stop_after_initial_checkbox.get_active()
         sprite_guillotine(image, drawable, direction, align, remove_bg, stop_after_initial)
