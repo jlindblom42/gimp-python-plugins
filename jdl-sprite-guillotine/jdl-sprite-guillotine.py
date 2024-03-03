@@ -1,8 +1,8 @@
 #! /usr/bin/python
 
-from gimpfu import *
-import gtk
 import gimpui
+import gtk
+from gimpfu import *
 
 HORIZONTAL = 0
 VERTICAL = 1
@@ -51,11 +51,8 @@ def guides_for_transparent(image, layer, loop_index, initial_direction):
 
     has_no_guides = True
     initial_loop = loop_index == 1
-    allow_vertical = True
-    allow_horizontal = True
-    if initial_loop:
-        allow_vertical = initial_direction != HORIZONTAL
-        allow_horizontal = initial_direction != VERTICAL
+    allow_vertical = not initial_loop or initial_direction != HORIZONTAL
+    allow_horizontal = not initial_loop or initial_direction != VERTICAL
     guide_clear(image)
     width = layer.width
     height = layer.height
@@ -248,16 +245,15 @@ def center_and_rename_layers(image, remove_bg_color, vertical_align):
 
 
 def position_layer(image, layer, vertical_align):
-    new_x_pos = (image.width - layer.width) / 2
+    img_w = image.width, img_h = image.height, layer_w = layer.width, layer_h = layer.height
 
-    if vertical_align == TOP:
-        new_y_pos = 0
-    elif vertical_align == BOTTOM:
-        new_y_pos = image.height - layer.height
-    else:
-        new_y_pos = (image.height - layer.height) / 2
+    new_x_pos = (img_w - layer_w) / 2
+    new_y_pos = None if False \
+        else 0 if vertical_align == TOP \
+        else img_h - layer_h if vertical_align == BOTTOM \
+        else (img_h - layer_h) / 2
 
-    layer.set_offsets(int(new_x_pos), int(new_y_pos))
+    layer.set_offsets(new_x_pos, new_y_pos)
 
 
 def center_and_rename_layer(image, index, layer, color_to_remove, vertical_align):
@@ -327,10 +323,6 @@ def sprite_guillotine(image, drawable, initial_direction, vertical_align, remove
 
 
 def sprite_guillotine_gui(image, drawable):
-    # settings = gtk.Settings.get_default()
-    # settings.set_property("gtk-application-prefer-dark-theme",
-    #                       True)  # if you want use dark theme, set second arg to True
-
     # Initialize GUI window
     dialog = gimpui.Dialog(title="Sprite Guillotine", role=None)
     dialog.set_default_size(400, 300)
@@ -343,7 +335,7 @@ def sprite_guillotine_gui(image, drawable):
     # Option for initial direction
     direction_frame = gtk.Frame("Initial Direction")
     vbox.pack_start(direction_frame, False, False, 0)
-    direction_box = gtk.VBox(spacing=6)
+    direction_box = gtk.HBox(spacing=6)
     direction_frame.add(direction_box)
     horizontal_radio = gtk.RadioButton(None, "Horizontal")
     vertical_radio = gtk.RadioButton(horizontal_radio, "Vertical")
@@ -354,7 +346,7 @@ def sprite_guillotine_gui(image, drawable):
     # Option for vertical align
     align_frame = gtk.Frame("Vertical Align")
     vbox.pack_start(align_frame, False, False, 0)
-    align_box = gtk.VBox(spacing=6)
+    align_box = gtk.HBox(spacing=6)
     align_frame.add(align_box)
     top_radio = gtk.RadioButton(None, "Top")
     middle_radio = gtk.RadioButton(top_radio, "Middle")
@@ -378,26 +370,22 @@ def sprite_guillotine_gui(image, drawable):
     global progress_bar
     progress_bar = gtk.ProgressBar()
     vbox.pack_start(progress_bar, False, False, 0)
-    set_text("Starting...")
-
-    # Add action buttons
+    set_text("Ready to start.")
     dialog.add_action_widget(gtk.Button("OK"), gtk.RESPONSE_OK)
     dialog.add_action_widget(gtk.Button("Cancel"), gtk.RESPONSE_CANCEL)
-
-    # Show the dialog
     dialog.show_all()
-
-    # Run the dialog and wait for user response
     response = dialog.run()
 
     if response == gtk.RESPONSE_OK:
-        direction = HORIZONTAL if horizontal_radio.get_active() else VERTICAL
-        if top_radio.get_active():
-            align = TOP
-        elif middle_radio.get_active():
-            align = MIDDLE
-        else:
-            align = BOTTOM
+        direction = None if False \
+            else HORIZONTAL if horizontal_radio.get_active() \
+            else VERTICAL
+
+        align = None if False \
+            else TOP if top_radio.get_active() \
+            else MIDDLE if middle_radio.get_active() \
+            else BOTTOM
+
         remove_bg = remove_bg_checkbox.get_active()
         stop_after_initial = stop_after_initial_checkbox.get_active()
         sprite_guillotine(image, drawable, direction, align, remove_bg, stop_after_initial)
@@ -406,7 +394,6 @@ def sprite_guillotine_gui(image, drawable):
     dialog.destroy()
 
 
-# sprite_guillotine(gimp.image_list()[0], gimp.image_list()[0].active_layer, HORIZONTAL)
 register(
     "sprite_guillotine",
     "",
@@ -419,14 +406,6 @@ register(
     [
         (PF_IMAGE, "image", "Input image", None),
         (PF_DRAWABLE, "drawable", "Input drawable", None),
-        # (PF_RADIO, "option", "Initial direction?", HORIZONTAL,
-        #  (("Horizontal", HORIZONTAL),
-        #   ("Vertical", VERTICAL))),
-        # (PF_RADIO, "option", "Vertical align?", MIDDLE,
-        #  (("Middle", MIDDLE),
-        #   ("Bottom", BOTTOM))),
-        # # (PF_BOOL, "stop_after_initial", "Stop after initial guide detect?", 0),
-        # (PF_BOOL, "remove_bg_color", "Remove BG Color?", 0),
     ],
     [],
     sprite_guillotine_gui, menu="<Image>/Filters")
