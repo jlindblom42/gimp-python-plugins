@@ -257,9 +257,6 @@ def position_layer(image, layer, vertical_align):
     else:
         new_y_pos = (image.height - layer.height) / 2
 
-    print_args([('new_x_pos', new_x_pos), ('new_y_pos', new_y_pos), ('vertical_align', vertical_align),
-                ('image_height', image.height), ('layer.height', layer.height)])
-
     layer.set_offsets(int(new_x_pos), int(new_y_pos))
 
 
