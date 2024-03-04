@@ -45,14 +45,12 @@ def guide_clear(image):
 has_no_guides_map = {}
 
 
-def guides_for_transparent(image, layer, loop_index, initial_direction):
+def guides_for_transparent(image, layer, loop_index, direction_priority):
     if layer.name in has_no_guides_map:
         return
 
     has_no_guides = True
-    initial_loop = loop_index == 1
-    allow_vertical = not initial_loop or initial_direction != HORIZONTAL
-    allow_horizontal = not initial_loop or initial_direction != VERTICAL
+    prioritize_vertical = direction_priority == VERTICAL
     guide_clear(image)
     num_cols = layer.width
     num_rows = layer.height
@@ -72,110 +70,124 @@ def guides_for_transparent(image, layer, loop_index, initial_direction):
 
         return transparency_memo[key]
 
-    if allow_horizontal:
-        first_guide = True
-        for curr_row_index in range(num_rows):
-            curr_row_transparent = True
-            for curr_col_index in range(num_cols):
-                if not is_transparent(curr_col_index, curr_row_index):
-                    curr_row_transparent = False
-                    break
-
-            if curr_row_index == 0 and not curr_row_transparent:
-                first_guide = False
-
-            next_row_transparent = True
-            next_row_index = curr_row_index + 1
-            for curr_col_index in range(num_cols):
-                if next_row_index < num_rows and not is_transparent(curr_col_index, next_row_index):
-                    next_row_transparent = False
-                    break
-
-            if curr_row_transparent and next_row_transparent:
-                continue
-
-            if not curr_row_transparent and next_row_transparent:
-                continue
-
-            next_row_connected = False
-            if not curr_row_transparent and not next_row_transparent:
-                for curr_col_index in range(num_cols):
-                    if not is_transparent(curr_col_index, curr_row_index):
-                        next_col_index = curr_col_index + 1
-                        prev_col_index = curr_col_index - 1
-                        next_row_connected = (
-                                not is_transparent(curr_col_index, next_row_index)
-                                or (next_col_index < num_cols
-                                    and not is_transparent(next_col_index, next_row_index))
-                                or (prev_col_index > 0
-                                    and not is_transparent(prev_col_index, next_row_index)))
-
-                        if next_row_connected:
-                            break
-
-            if not curr_row_transparent and not next_row_transparent and next_row_connected:
-                continue
-
-            if first_guide:
-                first_guide = False
-                continue
-
-            pdb.gimp_image_add_hguide(image, next_row_index)
-            has_no_guides = False
-
-    if allow_vertical:
-        first_guide = True
-        for curr_col_index in range(num_cols):
-            curr_col_transparent = True
-            for curr_row_index in range(num_rows):
-                if not is_transparent(curr_col_index, curr_row_index):
-                    curr_col_transparent = False
-                    break
-
-            if curr_col_index == 0 and not curr_col_transparent:
-                first_guide = False
-
-            next_col_transparent = True
-            next_col_index = curr_col_index + 1
-            for curr_row_index in range(num_rows):
-                if next_col_index < num_cols and not is_transparent(next_col_index, curr_row_index):
-                    next_col_transparent = False
-                    break
-
-            if curr_col_transparent and next_col_transparent:
-                continue
-
-            if not curr_col_transparent and next_col_transparent:
-                continue
-
-            next_col_connected = False
-            if not curr_col_transparent and not next_col_transparent:
-                for curr_row_index in range(num_rows):
-                    if not is_transparent(curr_col_index, curr_row_index):
-                        next_row_index = curr_row_index + 1
-                        prev_row_index = curr_row_index - 1
-                        next_col_connected = (
-                                not is_transparent(next_col_index, curr_row_index)
-                                or (next_row_index < num_rows
-                                    and not is_transparent(next_col_index, next_row_index))
-                                or (prev_row_index > 0
-                                    and not is_transparent(next_col_index, prev_row_index)))
-
-                        if next_col_connected:
-                            break
-
-            if not curr_col_transparent and not next_col_transparent and next_col_connected:
-                continue
-
-            if first_guide:
-                first_guide = False
-                continue
-
-            pdb.gimp_image_add_vguide(image, next_col_index)
-            has_no_guides = False
+    if prioritize_vertical:
+        has_no_guides = guides_for_vertical(has_no_guides, image, is_transparent, num_cols, num_rows)
+        if has_no_guides:
+            has_no_guides = guides_for_horizontal(has_no_guides, image, is_transparent, num_cols, num_rows)
+    else:
+        has_no_guides = guides_for_horizontal(has_no_guides, image, is_transparent, num_cols, num_rows)
+        if has_no_guides:
+            has_no_guides = guides_for_vertical(has_no_guides, image, is_transparent, num_cols, num_rows)
 
     if has_no_guides:
         has_no_guides_map[layer.name] = True
+
+
+def guides_for_vertical(has_no_guides, image, is_transparent, num_cols, num_rows):
+    first_guide = True
+    for curr_col_index in range(num_cols):
+        curr_col_transparent = True
+        for curr_row_index in range(num_rows):
+            if not is_transparent(curr_col_index, curr_row_index):
+                curr_col_transparent = False
+                break
+
+        if curr_col_index == 0 and not curr_col_transparent:
+            first_guide = False
+
+        next_col_transparent = True
+        next_col_index = curr_col_index + 1
+        for curr_row_index in range(num_rows):
+            if next_col_index < num_cols and not is_transparent(next_col_index, curr_row_index):
+                next_col_transparent = False
+                break
+
+        if curr_col_transparent and next_col_transparent:
+            continue
+
+        if not curr_col_transparent and next_col_transparent:
+            continue
+
+        next_col_connected = False
+        if not curr_col_transparent and not next_col_transparent:
+            for curr_row_index in range(num_rows):
+                if not is_transparent(curr_col_index, curr_row_index):
+                    next_row_index = curr_row_index + 1
+                    prev_row_index = curr_row_index - 1
+                    next_col_connected = (
+                            not is_transparent(next_col_index, curr_row_index)
+                            or (next_row_index < num_rows
+                                and not is_transparent(next_col_index, next_row_index))
+                            or (prev_row_index > 0
+                                and not is_transparent(next_col_index, prev_row_index)))
+
+                    if next_col_connected:
+                        break
+
+        if not curr_col_transparent and not next_col_transparent and next_col_connected:
+            continue
+
+        if first_guide:
+            first_guide = False
+            continue
+
+        pdb.gimp_image_add_vguide(image, next_col_index)
+        has_no_guides = False
+    return has_no_guides
+
+
+def guides_for_horizontal(has_no_guides, image, is_transparent, num_cols, num_rows):
+    first_guide = True
+    for curr_row_index in range(num_rows):
+        curr_row_transparent = True
+        for curr_col_index in range(num_cols):
+            if not is_transparent(curr_col_index, curr_row_index):
+                curr_row_transparent = False
+                break
+
+        if curr_row_index == 0 and not curr_row_transparent:
+            first_guide = False
+
+        next_row_transparent = True
+        next_row_index = curr_row_index + 1
+        for curr_col_index in range(num_cols):
+            if next_row_index < num_rows and not is_transparent(curr_col_index, next_row_index):
+                next_row_transparent = False
+                break
+
+        if curr_row_transparent and next_row_transparent:
+            continue
+
+        if not curr_row_transparent and next_row_transparent:
+            continue
+
+        next_row_connected = False
+        if not curr_row_transparent and not next_row_transparent:
+            for curr_col_index in range(num_cols):
+                if not is_transparent(curr_col_index, curr_row_index):
+                    next_col_index = curr_col_index + 1
+                    prev_col_index = curr_col_index - 1
+                    next_row_connected = (
+                            not is_transparent(curr_col_index, next_row_index)
+                            or (next_col_index < num_cols
+                                and not is_transparent(next_col_index, next_row_index))
+                            or (prev_col_index > 0
+                                and not is_transparent(prev_col_index, next_row_index)))
+
+                    if next_row_connected:
+                        break
+
+        if not curr_row_transparent and not next_row_transparent and next_row_connected:
+            continue
+
+        if first_guide:
+            first_guide = False
+            continue
+
+        pdb.gimp_image_add_hguide(image, next_row_index)
+        has_no_guides = False
+
+    return has_no_guides
 
 
 def get_guides(image):
@@ -259,9 +271,9 @@ def center_and_rename_layers(image, remove_bg_color, vertical_align):
 def position_layer(image, layer, vertical_align):
     new_x_pos = (image.width - layer.width) / 2
     new_y_pos = {
-        'TOP': 0,
-        'BOTTOM': image.height - layer.height,
-        'CENTER': (image.height - layer.height) / 2,
+        TOP: 0,
+        BOTTOM: image.height - layer.height,
+        MIDDLE: (image.height - layer.height) / 2,
     }.get(vertical_align, 0)
 
     layer.set_offsets(int(new_x_pos), int(new_y_pos))
@@ -291,7 +303,7 @@ def align_layer_keep_non_empty(image, layer):
         pdb.gimp_image_remove_layer(image, layer)
 
 
-def sprite_guillotine(image, drawable, initial_direction, vertical_align, remove_bg_color, stop_after_initial):
+def sprite_guillotine(image, drawable, direction_priority, vertical_align, remove_bg_color, stop_after_initial):
     image.undo_group_start()
     prev_elapsed_time_sec = 0
     loop_index = 0
@@ -307,7 +319,7 @@ def sprite_guillotine(image, drawable, initial_direction, vertical_align, remove
             layer_index = layer_index + 1
             pdb.gimp_selection_none(image)
             set_text('%s Detecting guides...' % loop_text)
-            guides_for_transparent(image, layer, loop_index, initial_direction)
+            guides_for_transparent(image, layer, loop_index, direction_priority)
             if stop_after_initial:
                 image.undo_group_end()
                 return
@@ -350,7 +362,7 @@ def sprite_guillotine_gui(image, drawable):
     vbox.show()
 
     # Option for initial direction
-    direction_frame = gtk.Frame("Initial Direction")
+    direction_frame = gtk.Frame("Direction Priority")
     vbox.pack_start(direction_frame, False, False, 0)
     direction_box = gtk.HBox(spacing=6)
     direction_frame.add(direction_box)
