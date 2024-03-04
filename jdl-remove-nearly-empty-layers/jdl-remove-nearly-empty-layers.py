@@ -28,11 +28,14 @@ def remove_nearly_empty_layers(image, threshold_percentage, output_only):
                 non_transparent_percentage, threshold_percentage, layer.name)
             if not output_only:
                 pdb.gimp_image_remove_layer(image, layer)
-            result_text += '%s\n' % progress
+        elif non_transparent_percentage - 5 < threshold_percentage:
+            progress = '~ (%d%% > %d%%) Ignored layer: %s' % (
+                non_transparent_percentage, threshold_percentage, layer.name)
         else:
             progress = '   (%d%% > %d%%) Ignored layer: %s' % (
                 non_transparent_percentage, threshold_percentage, layer.name)
-            result_text += '%s\n' % progress
+
+        result_text += '%s\n' % progress
 
     if result_text == '':
         result_text = 'No layers empty enough to be removed.'
